@@ -1,0 +1,572 @@
+{
+  "id": "generate_word_file",
+  "org": null,
+  "code": "async function generate_word_file(sections, title, header, footer, template, wordConfig, userSettings) {\n  try {\n    // Use template from parameter or fall back to user setting, but only if not 'default'\n    let templateToUse = template || (userSettings.selectedTemplate && userSettings.selectedTemplate !== 'default' ? userSettings.selectedTemplate : null);\n\n    // Helper function to convert font weight setting to style properties\n    const getFontStyle = (weightSetting) => {\n      switch(weightSetting) {\n        case 'Bold':\n          return { bold: true, italic: false };\n        case 'Italic':\n          return { bold: false, italic: true };\n        case 'Bold Italic':\n          return { bold: true, italic: true };\n        default: // 'Normal'\n          return { bold: false, italic: false };\n      }\n    };\n\n    // Get default text style\n    const defaultStyle = getFontStyle(userSettings.defaultFontWeight || 'Normal');\n    const userSelectedFont = userSettings.defaultFontFamily || 'Outfit';\n\n    // Combine header styles from individual settings\n    const headerStyles = {\n      h1: {\n        fontFamily: userSettings.h1FontFamily || userSelectedFont,\n        fontSize: userSettings.h1FontSize || 16,\n        ...getFontStyle(userSettings.h1FontWeight || 'Bold'),\n        format: userSettings.h1Format || 'decimal'\n      },\n      h2: {\n        fontFamily: userSettings.h2FontFamily || userSelectedFont,\n        fontSize: userSettings.h2FontSize || 14,\n        ...getFontStyle(userSettings.h2FontWeight || 'Bold'),\n        format: userSettings.h2Format || 'decimal'\n      },\n      h3: {\n        fontFamily: userSettings.h3FontFamily || userSelectedFont,\n        fontSize: userSettings.h3FontSize || 12,\n        ...getFontStyle(userSettings.h3FontWeight || 'Bold'),\n        format: userSettings.h3Format || 'decimal'\n      }\n    };\n\n    // Prepare the request body\n    const requestBody = {\n      title,\n      sections,\n      header: header ? { text: header, alignment: 'left' } : undefined,\n      footer: footer ? { text: footer, alignment: 'left' } : undefined,\n      ...(templateToUse ? { template: { templateId: templateToUse } } : {}),\n      wordConfig: {\n        ...wordConfig,\n        fontSize: wordConfig?.fontSize || 11,\n        fontFamily: userSelectedFont,\n        fontWeight: defaultStyle.bold ? 'bold' : 'normal',\n        fontStyle: defaultStyle.italic ? 'italic' : 'normal',\n        lineHeight: wordConfig?.lineHeight || '1.15',\n        showPageNumber: wordConfig?.showPageNumber || false,\n        showTableOfContent: wordConfig?.showTableOfContent || false,\n        pageOrientation: userSettings.defaultPageOrientation || 'portrait',\n        margins: userSettings.defaultMargins || 'normal',\n        headerStyles\n      }\n    };\n\n    // Make the API call\n    const response = await fetch(`${userSettings.pluginServer}/word-generator/generate`, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json'\n      },\n      body: JSON.stringify(requestBody)\n    });\n\n    if (!response.ok) {\n      throw new Error(`HTTP error! status: ${response.status}`);\n    }\n\n    const data = await response.json();\n\n    if (!data.downloadUrl) {\n      throw new Error('No download URL in response. Please verify that the correct plugin server URL is being used.');\n    }\n\n    return `Word document generated successfully! You can download it here: ${data.downloadUrl}`;\n  } catch (error) {\n    return `Error generating Word document: ${error.message}. Please verify that the correct plugin server URL is being used.`;\n  }\n}",
+  "uuid": "ccdcb522-dcb8-4711-9030-5a78490de090",
+  "emoji": "📄",
+  "title": "Word Generator - Unbound Group",
+  "name": "WordGenerator - Unbound Group",
+  "description": "Generate Word documents with Unbound Group entities branding and custom templates",
+  "logo_url": "https://em-content.zobj.net/source/microsoft-teams/363/page-facing-up_1f4c4.png",
+  "contact_email": "wolter@traffic-builders.com",
+  "legal_info_url": "",
+  "system": false,
+  "iconURL": "https://custom.typingmind.com/assets/plugins/microsoft-word.webp",
+  "disabled": false,
+  "syncedAt": null,
+  "api": {
+    "type": "openapi",
+    "url": "${pluginServer}/api/openapi.json"
+  },
+  "auth": {
+    "type": "none"
+  },
+  "openaiSpec": {
+    "name": "generate_word_file",
+    "description": "Generate a Word document based on the given sections, title, header, footer, and template settings. Supports custom templates, header styling, and various formatting options.",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "sections",
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "The title of the document."
+        },
+        "header": {
+          "type": "string",
+          "description": "The text to display in the header of each page."
+        },
+        "footer": {
+          "type": "string",
+          "description": "The text to display in the footer of each page."
+        },
+        "template": {
+          "type": "string",
+          "description": "ID of the template to use. If not provided, uses default template."
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "sectionId",
+              "content"
+            ],
+            "properties": {
+              "content": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "enum": [
+                        "paragraph",
+                        "listing",
+                        "table",
+                        "pageBreak",
+                        "emptyLine",
+                        "image"
+                      ],
+                      "type": "string",
+                      "description": "Specifies the type of content."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The text for paragraphs or list items."
+                    },
+                    "imageUrl": {
+                      "type": "string",
+                      "description": "URL of the image to include in the document."
+                    },
+                    "imageAlt": {
+                      "type": "string",
+                      "description": "Alternative text for the image."
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "A list of items for listing content."
+                    },
+                    "headers": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Headers for table content."
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "cells": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "text": {
+                                  "type": "string",
+                                  "description": "Text content for the table cell."
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "heading": {
+                "type": "string",
+                "description": "The heading of the section."
+              },
+              "sectionId": {
+                "type": "string",
+                "description": "A unique identifier for the section."
+              },
+              "headingLevel": {
+                "type": "integer",
+                "description": "The level of the heading (1 for H1, 2 for H2, 3 for H3)."
+              },
+              "parentSectionId": {
+                "type": "string",
+                "description": "The unique identifier of a parent section."
+              }
+            }
+          }
+        },
+        "wordConfig": {
+          "type": "object",
+          "properties": {
+            "fontSize": {
+              "type": "number",
+              "description": "Base font size for the document text."
+            },
+            "fontFamily": {
+              "type": "string",
+              "enum": [
+                "Arial",
+                "Calibri",
+                "Times New Roman",
+                "Courier New",
+                "Verdana",
+                "Tahoma",
+                "Georgia",
+                "Comic Sans MS",
+                "Outfit"
+              ],
+              "description": "Base font family for the document."
+            },
+            "lineHeight": {
+              "type": "string",
+              "enum": ["1", "1.15", "1.25", "1.5", "2"]
+            },
+            "showPageNumber": {
+              "type": "boolean"
+            },
+            "showTableOfContent": {
+              "type": "boolean"
+            },
+            "pageOrientation": {
+              "type": "string",
+              "enum": ["portrait", "landscape"]
+            },
+            "margins": {
+              "type": "string",
+              "enum": ["normal", "narrow", "moderate", "wide", "mirrored"]
+            },
+            "headerStyles": {
+              "type": "object",
+              "properties": {
+                "h1": {
+                  "type": "object",
+                  "properties": {
+                    "fontFamily": {
+                      "type": "string",
+                      "enum": [
+                        "Arial",
+                        "Calibri",
+                        "Times New Roman",
+                        "Courier New",
+                        "Verdana",
+                        "Tahoma",
+                        "Georgia",
+                        "Comic Sans MS",
+                        "Outfit"
+                      ]
+                    },
+                    "fontSize": { "type": "number" },
+                    "fontWeight": {
+                      "type": "string",
+                      "enum": ["normal", "bold"]
+                    },
+                    "format": {
+                      "type": "string",
+                      "enum": ["decimal", "roman", "letter"]
+                    }
+                  }
+                },
+                "h2": {
+                  "type": "object",
+                  "properties": {
+                    "fontFamily": {
+                      "type": "string",
+                      "enum": [
+                        "Arial",
+                        "Calibri",
+                        "Times New Roman",
+                        "Courier New",
+                        "Verdana",
+                        "Tahoma",
+                        "Georgia",
+                        "Comic Sans MS",
+                        "Outfit"
+                      ]
+                    },
+                    "fontSize": { "type": "number" },
+                    "fontWeight": {
+                      "type": "string",
+                      "enum": ["normal", "bold"]
+                    },
+                    "format": {
+                      "type": "string",
+                      "enum": ["decimal", "roman", "letter"]
+                    }
+                  }
+                },
+                "h3": {
+                  "type": "object",
+                  "properties": {
+                    "fontFamily": {
+                      "type": "string",
+                      "enum": [
+                        "Arial",
+                        "Calibri",
+                        "Times New Roman",
+                        "Courier New",
+                        "Verdana",
+                        "Tahoma",
+                        "Georgia",
+                        "Comic Sans MS",
+                        "Outfit"
+                      ]
+                    },
+                    "fontSize": { "type": "number" },
+                    "fontWeight": {
+                      "type": "string",
+                      "enum": ["normal", "bold"]
+                    },
+                    "format": {
+                      "type": "string",
+                      "enum": ["decimal", "roman", "letter"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "name": "getTemplates",
+      "description": "Get available Word templates",
+      "url": "https://plugins-server-tm-777v.onrender.com/word-generator/templates",
+      "input_schema": {},
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "description": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "generateWordDocument",
+      "description": "Generate a Word document with custom template and styling",
+      "url": "https://plugins-server-tm-777v.onrender.com/word-generator/generate",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "header": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "alignment": { "type": "string" }
+            }
+          },
+          "footer": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "alignment": { "type": "string" }
+            }
+          },
+          "sections": { "type": "array" },
+          "template": {
+            "type": "object",
+            "properties": {
+              "templateId": { "type": "string" }
+            }
+          },
+          "wordConfig": { "type": "object" }
+        },
+        "required": ["title", "sections"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "downloadUrl": { "type": "string" }
+        }
+      }
+    }
+  ],
+  "userSettings": [
+    {
+      "name": "pluginServer",
+      "type": "text",
+      "label": "Plugin Server",
+      "required": true,
+      "description": "The URL of the plugin server",
+      "placeholder": "https://...."
+    },
+    {
+      "name": "selectedTemplate",
+      "type": "enum",
+      "label": "Word Template",
+      "values": [
+        "default",
+        "traffic-builders",
+        "shoq",
+        "unbound-group"
+      ],
+      "default": "default",
+      "description": "Select a template for document generation"
+    },
+    {
+      "name": "defaultFontFamily",
+      "type": "enum",
+      "label": "Default Font",
+      "values": [
+        "Outfit",
+        "Arial",
+        "Calibri",
+        "Times New Roman",
+        "Courier New",
+        "Verdana",
+        "Tahoma",
+        "Georgia",
+        "Comic Sans MS"
+      ],
+      "default": "Outfit",
+      "description": "Default font family for document text"
+    },
+    {
+      "name": "defaultFontWeight",
+      "type": "enum",
+      "label": "Default Font Weight",
+      "values": [
+        "Normal",
+        "Bold",
+        "Italic",
+        "Bold Italic"
+      ],
+      "default": "Normal",
+      "description": "Default font weight and style for document text"
+    },
+    {
+      "name": "defaultPageOrientation",
+      "type": "enum",
+      "label": "Default Page Orientation",
+      "values": ["portrait", "landscape"],
+      "default": "portrait",
+      "description": "Default page orientation for documents"
+    },
+    {
+      "name": "defaultMargins",
+      "type": "enum",
+      "label": "Default Margins",
+      "values": ["normal", "narrow", "moderate", "wide", "mirrored"],
+      "default": "normal",
+      "description": "Default margin settings for documents"
+    },
+    {
+      "name": "h1FontFamily",
+      "type": "enum",
+      "label": "Heading 1 - Font",
+      "values": [
+        "Outfit",
+        "Arial",
+        "Calibri",
+        "Times New Roman",
+        "Courier New",
+        "Verdana",
+        "Tahoma",
+        "Georgia",
+        "Comic Sans MS"
+      ],
+      "default": "Outfit",
+      "description": "Font family for Heading 1"
+    },
+    {
+      "name": "h1FontSize",
+      "type": "number",
+      "label": "Heading 1 - Size",
+      "default": 16,
+      "description": "Font size for Heading 1"
+    },
+    {
+      "name": "h1FontWeight",
+      "type": "enum",
+      "label": "Heading 1 - Style",
+      "values": [
+        "Normal",
+        "Bold",
+        "Italic",
+        "Bold Italic"
+      ],
+      "default": "Bold",
+      "description": "Font weight and style for Heading 1"
+    },
+    {
+      "name": "h1Format",
+      "type": "enum",
+      "label": "Heading 1 - Numbering",
+      "values": ["decimal", "roman", "letter"],
+      "default": "decimal",
+      "description": "Numbering format for Heading 1"
+    },
+    {
+      "name": "h2FontFamily",
+      "type": "enum",
+      "label": "Heading 2 - Font",
+      "values": [
+        "Outfit",
+        "Arial",
+        "Calibri",
+        "Times New Roman",
+        "Courier New",
+        "Verdana",
+        "Tahoma",
+        "Georgia",
+        "Comic Sans MS"
+      ],
+      "default": "Outfit",
+      "description": "Font family for Heading 2"
+    },
+    {
+      "name": "h2FontSize",
+      "type": "number",
+      "label": "Heading 2 - Size",
+      "default": 14,
+      "description": "Font size for Heading 2"
+    },
+    {
+      "name": "h2FontWeight",
+      "type": "enum",
+      "label": "Heading 2 - Style",
+      "values": [
+        "Normal",
+        "Bold",
+        "Italic",
+        "Bold Italic"
+      ],
+      "default": "Bold",
+      "description": "Font weight and style for Heading 2"
+    },
+    {
+      "name": "h2Format",
+      "type": "enum",
+      "label": "Heading 2 - Numbering",
+      "values": ["decimal", "roman", "letter"],
+      "default": "decimal",
+      "description": "Numbering format for Heading 2"
+    },
+    {
+      "name": "h3FontFamily",
+      "type": "enum",
+      "label": "Heading 3 - Font",
+      "values": [
+        "Outfit",
+        "Arial",
+        "Calibri",
+        "Times New Roman",
+        "Courier New",
+        "Verdana",
+        "Tahoma",
+        "Georgia",
+        "Comic Sans MS"
+      ],
+      "default": "Outfit",
+      "description": "Font family for Heading 3"
+    },
+    {
+      "name": "h3FontSize",
+      "type": "number",
+      "label": "Heading 3 - Size",
+      "default": 12,
+      "description": "Font size for Heading 3"
+    },
+    {
+      "name": "h3FontWeight",
+      "type": "enum",
+      "label": "Heading 3 - Style",
+      "values": [
+        "Normal",
+        "Bold",
+        "Italic",
+        "Bold Italic"
+      ],
+      "default": "Bold",
+      "description": "Font weight and style for Heading 3"
+    },
+    {
+      "name": "h3Format",
+      "type": "enum",
+      "label": "Heading 3 - Numbering",
+      "values": ["decimal", "roman", "letter"],
+      "default": "decimal",
+      "description": "Numbering format for Heading 3"
+    }
+  ],
+  "workflow": {
+    "steps": [
+      {
+        "type": "function_call",
+        "function": "selectTemplate",
+        "input": {},
+        "output_name": "selectedTemplate"
+      },
+      {
+        "type": "function_call",
+        "function": "generateWordDocument",
+        "input": {
+          "title": "{userInput.title}",
+          "sections": "{userInput.sections}",
+          "header": "{userInput.header}",
+          "footer": "{userInput.footer}",
+          "template": "{selectedTemplate}",
+          "wordConfig": "{userInput.wordConfig}"
+        }
+      }
+    ]
+  }
+}

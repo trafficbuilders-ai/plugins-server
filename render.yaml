@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: word-generator-service
+    env: node
+    buildCommand: docker build -t word-generator .
+    startCommand: docker run -p 3000:3000 word-generator
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+    healthCheckPath: /health
+    autoDeploy: true 

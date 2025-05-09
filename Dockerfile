@@ -1,22 +1,25 @@
-FROM node:current-slim
+FROM node:18-alpine
+
+# Install system dependencies required for sharp
+RUN apk add --no-cache python3 make g++
 
 # Create app directory
 WORKDIR /usr/src/app
 
-# Copy package.json and package-lock.json
+# Copy package files
 COPY package*.json ./
 
-# Install app dependencies
+# Install dependencies
 RUN npm ci
 
-# Bundle app source
+# Copy source code
 COPY . .
 
-# Build the TypeScript files
+# Build the application
 RUN npm run build
 
-# Expose port 8080
-EXPOSE 8080
+# Expose port
+EXPOSE 3000
 
-# Start the app
-CMD npm run start
+# Start the application
+CMD ["npm", "start"]

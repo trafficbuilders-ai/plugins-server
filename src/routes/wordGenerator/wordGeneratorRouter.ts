@@ -6,6 +6,7 @@ import {
   FootnoteReferenceRun,
   Header,
   HeadingLevel,
+  ImageRun,
   LeaderType,
   LevelFormat,
   Packer,
@@ -31,6 +32,14 @@ import { ResponseStatus, ServiceResponse } from '@/common/models/serviceResponse
 import { handleServiceResponse } from '@/common/utils/httpHandlers';
 
 import { WordGeneratorRequestBodySchema, WordGeneratorResponseSchema } from './wordGeneratorModel';
+import {
+  applyHeaderStyles,
+  DEFAULT_HEADER_STYLES,
+  loadTemplate,
+  processImage,
+  validateHeaderStyles,
+} from './wordGeneratorUtils';
+
 export const COMPRESS = true;
 export const wordGeneratorRegistry = new OpenAPIRegistry();
 wordGeneratorRegistry.register('WordGenerator', WordGeneratorResponseSchema);
@@ -295,69 +304,128 @@ const generateTable = (tableData: any) => {
   });
 };
 
-// Recursive function to handle sections and sub-sections
-const generateSectionContent = (section: any, config: any) => {
-  // Section Content
-  const sectionContents = section.content.flatMap((child: any) => {
-    const results = [];
-    // Handle paragraph content
-    if (child.type === 'paragraph') {
-      const paragraphChildren = [];
-      if (child.text.includes('\n')) {
-        // Split the text by newline characters
-        const lines = child.text.split('\n');
-        // Log each line
-        lines.forEach((line: string) => {
-          paragraphChildren.push(new TextRun({ text: line, break: 1 }));
-        });
-        paragraphChildren.push(...lines);
-      } else {
-        paragraphChildren.push(new TextRun(child.text));
-      }
+// Modified generateSectionContent function to handle images and custom header styles
+const generateSectionContent = async (section: any, config: any) => {
+  const content: any[] = [];
 
-      if (child.footnote) {
-        paragraphChildren.push(new FootnoteReferenceRun(child.footnote.id));
+  // Add heading if present
+  if (section.heading) {
+    try {
+      if (config.headerStyles && validateHeaderStyles(config.headerStyles)) {
+        content.push(applyHeaderStyles(section.heading, section.headingLevel || 1, config.headerStyles));
+      } else {
+        // Fallback to existing heading logic
+        content.push(
+          new Paragraph({
+            text: section.heading,
+            heading: getHeadingLevel(section.headingLevel || 1),
+            spacing: {
+              before: 400,
+              after: 400,
+            },
+          })
+        );
       }
-      results.push(new Paragraph({ children: paragraphChildren }));
-    } else if (child.type === 'listing' && child.items) {
-      // Handle list content with bullets (level 0)
-      // Create a new paragraph for each list item and apply the bullet style (level 0)
-      results.push(
-        ...child.items.flatMap(
-          (item: any) =>
-            new Paragraph({
-              children: [new TextRun(item)],
-              bullet: {
-                level: 0,
-                reference: BULLET_CONFIG.reference,
-              } as any,
-            })
-        )
-      );
-    } else if (child.type === 'table') {
-      results.push(generateTable(child));
-    } else if (child.type === 'pageBreak') {
-      results.push(
+    } catch (error) {
+      console.error('Error applying header styles, using default:', error);
+      content.push(
         new Paragraph({
-          text: '',
-          pageBreakBefore: true,
-        })
-      );
-    } else if (child.type === 'emptyLine') {
-      results.push(
-        new Paragraph({
-          text: '',
-        })
-      );
-    } else {
-      results.push(
-        new Paragraph({
-          children: [new TextRun('Unsupported content type.')],
+          text: section.heading,
+          heading: getHeadingLevel(section.headingLevel || 1),
+          spacing: {
+            before: 400,
+            after: 400,
+          },
         })
       );
     }
-    return results;
-  });
+  }
+
+  // Process content
+  for (const item of section.content) {
+    try {
+      switch (item.type) {
+        case 'image':
+          if (item.url) {
+            const imageBuffer = await processImage(item.url);
+            if (imageBuffer) {
+              content.push(
+                new Paragraph({
+                  children: [
+                    new ImageRun({
+                      data: imageBuffer,
+                      transformation: {
+                        width: item.width || 400,
+                        height: item.height || 300,
+                      },
+                    }),
+                  ],
+                  spacing: {
+                    after: 200,
+                  },
+                })
+              );
+            }
+          }
+          break;
+        case 'paragraph':
+          if (item.text) {
+            content.push(
+              new Paragraph({
+                text: item.text,
+                spacing: {
+                  after: 200,
+                },
+              })
+            );
+          }
+          break;
+        case 'listing':
+          if (item.items) {
+            content.push(
+              ...item.items.flatMap(
+                (item: any) =>
+                  new Paragraph({
+                    children: [new TextRun(item)],
+                    bullet: {
+                      level: 0,
+                      reference: BULLET_CONFIG.reference,
+                    } as any,
+                  })
+              )
+            );
+          }
+          break;
+        case 'table':
+          content.push(generateTable(item));
+          break;
+        case 'pageBreak':
+          content.push(
+            new Paragraph({
+              text: '',
+              pageBreakBefore: true,
+            })
+          );
+          break;
+        case 'emptyLine':
+          content.push(
+            new Paragraph({
+              text: '',
+            })
+          );
+          break;
+        default:
+          content.push(
+            new Paragraph({
+              children: [new TextRun('Unsupported content type.')],
+            })
+          );
+      }
+    } catch (error) {
+      console.error(`Error processing content item:`, error);
+      // Continue with next item
+    }
+  }
 
   let numberingConfig;
   if (config.numberingReference) {
@@ -383,7 +451,7 @@ const generateSectionContent = (section: any, config: any) => {
   const sectionContent = [
     // Section Heading with index
     headingContent,
-    ...sectionContents,
+    ...content,
     // Process sub-sections if they exist
     ...(section.subSections
       ? section.subSections.flatMap((subSection: any) => generateSectionContent(subSection, config))
@@ -423,6 +491,7 @@ const buildSectionsHierarchy = (sections: any[]) => {
   return rootSections;
 };
 
+// Modified execGenWordFuncs to handle templates
 async function execGenWordFuncs(
   data: {
     title: string;
@@ -439,110 +508,110 @@ async function execGenWordFuncs(
     lineHeight: number;
     margins: string;
     showTableOfContent: boolean;
+    headerStyles?: any;
+    template?: string;
   }
 ) {
-  let headerConfigs = {};
-  if (data.header && data.header.text) {
-    headerConfigs = {
-      default: new Header({
-        children: [
-          new Paragraph({
-            text: data.header.text,
-            alignment: String(data.header?.alignment ?? 'left').toLowerCase(),
-          } as any),
-        ],
-      }),
-    };
-  }
+  try {
+    // Try to load template if specified
+    let doc: Document;
+    if (config.template && config.template !== 'default') {
+      const templateDoc = loadTemplate(config.template);
+      if (templateDoc) {
+        doc = templateDoc;
+      } else {
+        // Fallback to new document if template loading fails
+        doc = new Document();
+      }
+    } else {
+      doc = new Document();
+    }
 
-  let footerConfigs = {};
-  const footerChildren = [];
-  if (config.showPageNumber || (data.footer && data.footer.text)) {
-    if (data.footer && data.footer.text) {
-      footerChildren.push(
+    let headerConfigs = {};
+    if (data.header && data.header.text) {
+      headerConfigs = {
+        default: new Header({
+          children: [
+            new Paragraph({
+              text: data.header.text,
+              alignment: String(data.header?.alignment ?? 'left').toLowerCase(),
+            } as any),
+          ],
+        }),
+      };
+    }
+
+    let footerConfigs = {};
+    const footerChildren = [];
+    if (config.showPageNumber || (data.footer && data.footer.text)) {
+      if (data.footer && data.footer.text) {
+        footerChildren.push(
+          new Paragraph({
+            text: data.footer.text,
+            alignment: String(data.footer?.alignment ?? 'left').toLowerCase(),
+          } as any)
+        );
+      }
+
+      if (config.showPageNumber) {
+        footerChildren.push(
+          new Paragraph({
+            children: [
+              new TextRun({
+                children: ['Page ', PageNumber.CURRENT, ' of ', PageNumber.TOTAL_PAGES],
+              }),
+            ],
+          })
+        );
+      }
+
+      footerConfigs = {
+        default: new Footer({
+          children: footerChildren,
+        }),
+      };
+    }
+
+    // Generate the footnotes
+    const footnoteConfig = generateFootnotes(data.sections);
+    const numberingConfig: any[] = [BULLET_CONFIG];
+    const selectedNumberingOption = NUMBERING_OPTIONS[config.numberingReference];
+    if (selectedNumberingOption) {
+      numberingConfig.push(selectedNumberingOption);
+    }
+
+    const tableOfContentConfigs = [];
+    if (config.showTableOfContent) {
+      tableOfContentConfigs.push(
         new Paragraph({
-          text: data.footer.text,
-          alignment: String(data.footer?.alignment ?? 'left').toLowerCase(),
+          children: [
+            new TextRun({
+              text: 'Table of Contents',
+              bold: true,
+              size: FONT_CONFIG.tableOfContentSize * 2,
+            }),
+          ],
+          spacing: { after: SPACING_CONFIG.tableOfContent.after * 20 },
+        })
+      );
+      tableOfContentConfigs.push(
+        new TableOfContents({
+          stylesWithLevels: [
+            { style: 'Heading1', level: 1 },
+            { style: 'Heading2', level: 2 },
+            { style: 'Heading3', level: 3 },
+            { style: 'Heading4', level: 4 },
+          ],
+          leader: LeaderType.DOT, // Dot leader
         } as any)
       );
     }
 
-    if (config.showPageNumber) {
-      footerChildren.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              children: ['Page ', PageNumber.CURRENT, ' of ', PageNumber.TOTAL_PAGES],
-            }),
-          ],
-        })
-      );
-    }
+    // Build sections hierarchy
+    const sectionsHierarchy = buildSectionsHierarchy(data.sections);
 
-    footerConfigs = {
-      default: new Footer({
-        children: footerChildren,
-      }),
-    };
-  }
-
-  // Generate the footnotes
-  const footnoteConfig = generateFootnotes(data.sections);
-  const numberingConfig: any[] = [BULLET_CONFIG];
-  const selectedNumberingOption = NUMBERING_OPTIONS[config.numberingReference];
-  if (selectedNumberingOption) {
-    numberingConfig.push(selectedNumberingOption);
-  }
-
-  const tableOfContentConfigs = [];
-  if (config.showTableOfContent) {
-    tableOfContentConfigs.push(
-      new Paragraph({
-        children: [
-          new TextRun({
-            text: 'Table of Contents',
-            bold: true,
-            size: FONT_CONFIG.tableOfContentSize * 2,
-          }),
-        ],
-        spacing: { after: SPACING_CONFIG.tableOfContent.after * 20 },
-      })
-    );
-    tableOfContentConfigs.push(
-      new TableOfContents({
-        stylesWithLevels: [
-          { style: 'Heading1', level: 1 },
-          { style: 'Heading2', level: 2 },
-          { style: 'Heading3', level: 3 },
-          { style: 'Heading4', level: 4 },
-        ],
-        leader: LeaderType.DOT, // Dot leader
-      } as any)
-    );
-  }
-
-  // Build sections hierarchy
-  const sectionsHierarchy = buildSectionsHierarchy(data.sections);
-
-  // Create the document based on JSON data
-  const doc = new Document({
-    styles: {
-      default: {
-        document: {
-          run: {
-            font: config.fontFamily,
-            size: config.fontSize * 2, // Font size in half-points
-          },
-          paragraph: {
-            spacing: { line: config.lineHeight }, // Line height
-          },
-        },
-      },
-    },
-    numbering: {
-      config: numberingConfig,
-    },
-    sections: [
+    // Create the document based on JSON data
+    const docContent = [
       {
         properties: {
           page: {
@@ -571,19 +640,53 @@ async function execGenWordFuncs(
           ),
         ],
       },
-    ],
-    footnotes: footnoteConfig, // TODO: Enhance footnote
-  });
+    ];
 
-  const fileName = `word-file-${new Date().toISOString().replace(/\D/gi, '')}.docx`;
-  const filePath = path.join(exportsDir, fileName);
+    doc.sections = docContent;
+    doc.styles = {
+      default: {
+        document: {
+          run: {
+            font: config.fontFamily,
+            size: config.fontSize * 2, // Font size in half-points
+          },
+          paragraph: {
+            spacing: { line: config.lineHeight }, // Line height
+          },
+        },
+      },
+    };
+    doc.numbering = {
+      config: numberingConfig,
+    };
+    doc.footnotes = footnoteConfig; // TODO: Enhance footnote
 
-  // Create and save the document
-  Packer.toBuffer(doc).then((buffer) => {
-    fs.writeFileSync(filePath, buffer);
-  });
+    const fileName = `word-file-${new Date().toISOString().replace(/\D/gi, '')}.docx`;
+    const filePath = path.join(exportsDir, fileName);
 
-  return fileName;
+    // Create and save the document
+    Packer.toBuffer(doc).then((buffer) => {
+      fs.writeFileSync(filePath, buffer);
+    });
+
+    return fileName;
+  } catch (error) {
+    console.error('Error in document generation:', error);
+    // Fallback to basic document generation
+    return new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({
+              text: data.title,
+              heading: HeadingLevel.HEADING_1,
+            }),
+          ],
+        },
+      ],
+    });
+  }
 }
 
 export const wordGeneratorRouter: Router = (() => {
@@ -603,6 +706,28 @@ export const wordGeneratorRouter: Router = (() => {
       return handleServiceResponse(validateServiceResponse, res);
     }
 
+    // Construct headerStyles from individual settings
+    const headerStyles = {
+      h1: {
+        font: wordConfig.h1Font || 'Outfit',
+        size: wordConfig.h1Size || 14,
+        bold: wordConfig.h1Bold === 'false' ? false : true,
+        color: wordConfig.h1Color || '000000',
+      },
+      h2: {
+        font: wordConfig.h2Font || 'Outfit',
+        size: wordConfig.h2Size || 12,
+        bold: wordConfig.h2Bold === 'false' ? false : true,
+        color: wordConfig.h2Color || '000000',
+      },
+      h3: {
+        font: wordConfig.h3Font || 'Outfit',
+        size: wordConfig.h3Size || 10,
+        bold: wordConfig.h3Bold === 'false' ? false : true,
+        color: wordConfig.h3Color || '000000',
+      },
+    };
+
     try {
       const wordConfigs = {
         numberingReference: wordConfig.showNumberingInHeader ? wordConfig.numberingReference : '',
@@ -613,6 +738,8 @@ export const wordGeneratorRouter: Router = (() => {
         lineHeight: wordConfig.lineHeight ? LINE_HEIGHT_CONFIG[wordConfig.lineHeight] : LINE_HEIGHT_CONFIG['1.15'],
         margins: wordConfig.margins ? PAGE_MARGINS[wordConfig.margins] : PAGE_MARGINS.NORMAL,
         showTableOfContent: wordConfig.showTableOfContent ?? false,
+        headerStyles,
+        template: wordConfig.template,
       };
 
       const fileName = await execGenWordFuncs(
@@ -648,5 +775,11 @@ export const wordGeneratorRouter: Router = (() => {
       return handleServiceResponse(errorServiceResponse, res);
     }
   });
+
+  // Health check endpoint
+  router.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+  });
+
   return router;
 })();
