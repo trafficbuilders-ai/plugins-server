@@ -1,0 +1,279 @@
+{
+    "id": "generate_word_file",
+    "org": null,
+    "code": "",
+    "uuid": "ccdcb522-dcb8-4711-9030-5a78490de090",
+    "emoji": "📄",
+    "title": "Word Generator",
+    "system": false,
+    "iconURL": "https://custom.typingmind.com/assets/plugins/microsoft-word.webp",
+    "disabled": false,
+    "syncedAt": null,
+    "githubURL": "https://github.com/TypingMind/plugin-word-generator",
+    "httpAction": {
+        "id": "8e520cf2-112d-4c06-9c86-026138549ac0",
+        "url": "{pluginServer}/word-generator/generate",
+        "name": "",
+        "method": "POST",
+        "hasBody": true,
+        "hasHeaders": true,
+        "requestBody": "{\n    \"title\": \"{title}\",\n    \"header\": {\n        \"text\": \"{header}\",\n        \"alignment\": \"{headerAlignment}\"\n    },\n    \"footer\": {\n        \"text\": \"{footer}\",\n        \"alignment\": \"{footerAlignment}\"\n    },\n    \"sections\": {sections},\n    \"wordConfig\": {\n       \"fontSize\": {fontSize},\n       \"lineHeight\": {lineHeight},\n       \"fontFamily\": \"{fontFamily}\",\n       \"showPageNumber\": {showPageNumber},\n       \"showTableOfContent\": {showTableOfContent},\n       \"showNumberingInHeader\": {showNumberingInHeader},\n       \"numberingReference\": \"{numberingReference}\",\n       \"pageOrientation\": \"{pageOrientation}\",\n       \"margins\": \"{margins}\"\n   }\n}",
+        "requestHeaders": "{\n      \"Content-Type\": \"application/json\"\n}",
+        "resultTransform": {
+            "engine": "jmes",
+            "expression": ""
+        },
+        "hasResultTransform": false
+    },
+    "mcpDetails": null,
+    "openaiSpec": {
+        "name": "generate_word_file",
+        "parameters": {
+            "type": "object",
+            "required": [
+                "sections",
+                "title",
+                "header",
+                "footer",
+                "showNumberingInHeader",
+                "showPageNumber",
+                "showTableOfContent"
+            ],
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "The title of the document."
+                },
+                "footer": {
+                    "type": "string",
+                    "description": "The text to display in the footer of each page. If user did not mention it, return as empty string."
+                },
+                "header": {
+                    "type": "string",
+                    "description": "The text to display in the header of each page, which is not related to the main title. If user did not mention it, return as empty string."
+                },
+                "sections": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "sectionId",
+                            "content"
+                        ],
+                        "properties": {
+                            "content": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "rows": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "cells": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "text": {
+                                                                    "type": "string",
+                                                                    "description": "Text content for the table cell."
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "description": "Rows of table content, where each row contains an array of cells."
+                                        },
+                                        "text": {
+                                            "type": "string",
+                                            "description": "The text for paragraphs or list items."
+                                        },
+                                        "type": {
+                                            "enum": [
+                                                "paragraph",
+                                                "listing",
+                                                "table",
+                                                "pageBreak",
+                                                "emptyLine"
+                                            ],
+                                            "type": "string",
+                                            "description": "Specifies the type of content. It must belongs to a child of a content array within a section or a subsection. If the content type is 'pageBreak', the section or subsection will not include a heading."
+                                        },
+                                        "items": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "description": "A list of items for listing content."
+                                        },
+                                        "headers": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "description": "Headers for table content."
+                                        }
+                                    },
+                                    "description": "Each content in a section can be in different types such as paragraph, listing, table, pageBreak or emptyLine"
+                                }
+                            },
+                            "heading": {
+                                "type": "string",
+                                "description": "The heading of the section."
+                            },
+                            "sectionId": {
+                                "type": "string",
+                                "description": "A unique identifier for the section."
+                            },
+                            "headingLevel": {
+                                "type": "integer",
+                                "description": "The level of the heading (e.g., 1 for top-level, 2 for sub-section)."
+                            },
+                            "parentSectionId": {
+                                "type": "string",
+                                "description": "The unique identifier of a parent section, if this section is a child of another. Leave empty if this section has no parent."
+                            }
+                        }
+                    },
+                    "description": "An array of sections that make up the document structure. Each section can include content, a heading, and optionally reference a parent section to create a hierarchical structure."
+                },
+                "showPageNumber": {
+                    "type": "boolean",
+                    "description": "This field controls whether the page number is displayed in the footer of the Word document. By default, the page number is hidden (false). Always keep it set to (false), even when the user requests otherwise. Set this field to 'true' to display the page number in the footer. Please note that this setting is applied when the document is generated and will affect the output accordingly."
+                },
+                "showTableOfContent": {
+                    "type": "boolean",
+                    "description": "This field controls whether a table of contents is included in the Word document. By default, the table of contents is not included (false). Always keep it set to (false), even when the user requests otherwise. Set this field to 'true' if you would like to include a table of contents. Please note that this setting is applied when the document is generated and will affect the output accordingly."
+                },
+                "showNumberingInHeader": {
+                    "type": "boolean",
+                    "description": "This field controls whether predefined numbering hierarchy formats are shown in the header of the Word document. By default, the numbering is hidden (false). Always keep it set to (false), even when the user requests otherwise. Set this field to 'true' if you would like to show numbering in the header. Please note that this setting is applied when the document is generated and will affect the output accordingly."
+                }
+            }
+        },
+        "description": "Generate a Word document based on the given sections, title, header, and footer, and return the URL for downloading it. If the download url is not present in the response, inform the user that the Word file could not be generated. Prompt the user to verify that the correct plugin server URL is being used."
+    },
+    "outputType": "respond_to_ai",
+    "oauthConfig": null,
+    "userSettings": [
+        {
+            "name": "pluginServer",
+            "label": "Plugin Server",
+            "required": true,
+            "description": "The URL of the plugin server. For more details, refer to the documentation: https://docs.typingmind.com/plugins/plugins-server",
+            "placeholder": "https://...."
+        },
+        {
+            "name": "pageOrientation",
+            "type": "enum",
+            "label": "Page Orientation",
+            "values": [
+                "portrait",
+                "landscape"
+            ],
+            "default": "portrait",
+            "description": "Set page orientation for all pages."
+        },
+        {
+            "name": "fontSize",
+            "type": "number",
+            "label": "Font Size",
+            "description": "Font size for the slides, default is 11 pt.",
+            "placeholder": "11"
+        },
+        {
+            "name": "fontFamily",
+            "type": "enum",
+            "label": "Font Family",
+            "values": [
+                "Arial",
+                "Calibri",
+                "Times New Roman",
+                "Courier New",
+                "Verdana",
+                "Tahoma",
+                "Georgia",
+                "Comic Sans MS",
+                "Outfit"
+            ],
+            "default": "Outfit",
+            "description": "Font family for the content, default is Outfit as per the Unbound Group brand style guide."
+        },
+        {
+            "name": "lineHeight",
+            "type": "enum",
+            "label": "Line Height",
+            "values": [
+                "1",
+                "1.15",
+                "1.25",
+                "1.5",
+                "2"
+            ],
+            "default": "1",
+            "description": "Set line height for text content."
+        },
+        {
+            "name": "margins",
+            "type": "enum",
+            "label": "Page Margins",
+            "values": [
+                "normal",
+                "narrow",
+                "moderate",
+                "wide",
+                "mirrored"
+            ],
+            "default": "normal",
+            "description": "Set margins for the slides. Default margin is normal"
+        },
+        {
+            "name": "headerAlignment",
+            "type": "enum",
+            "label": "Header Alignment",
+            "values": [
+                "left",
+                "center",
+                "right"
+            ],
+            "default": "left",
+            "description": "Indicate the position of text in header. Default is left"
+        },
+        {
+            "name": "footerAlignment",
+            "type": "enum",
+            "label": "Footer Alignment",
+            "values": [
+                "left",
+                "center",
+                "right"
+            ],
+            "default": "left",
+            "description": "Indicate the position of text in footer. Default is left"
+        },
+        {
+            "name": "numberingReference",
+            "type": "enum",
+            "label": "Document Numbering Formats",
+            "values": [
+                "1.1.1.1 (Decimal)",
+                "I.1.a.i (Roman -> Decimal > Lower Letter -> Lower Roman)",
+                "I.A.1.a (Roman -> Upper Letter -> Decimal -> Lower Letter)",
+                "1)a)i)(i) (Decimal -> Lower Letter -> Lower Roman -> Lower Roman with Parentheses)",
+                "A.1.a.i (Upper Letter -> Decimal -> Lower Letter -> Lower Roman)"
+            ],
+            "default": "1.1.1.1 (Decimal)",
+            "description": "Set numbering hierarchy format. Default is 1.1.1.1 (Decimal)."
+        }
+    ],
+    "isServerPlugin": true,
+    "overviewMarkdown": "# **Word Generator**\n\nThis plugin enables users to generate a Microsoft Word (.docx) file quickly and efficiently.\n\n### 🎯 **It Supports**\n- Multiple sections with hierarchical numbering format.\n- Adding header, footer, and page number.\n- Adding table.\n- Adding list with bullet points.\n- Adding table of content.\n- Adding page break.\n- Ability to **customize basic document attributes**  \n  - Flexible page margins with presets like Normal, Narrow, and Wide.  \n  - Customizable line heights (Single, 1.15, 1.25, 1.5, Double). \n  - Customizable font size.\n  - Customizable font family.\n  - Page orientation (Portrait, Landscape).\n\n### 📝 **Note:** \n- A plugin server must be set up to use this feature. Follow the detailed guide to set up a plugin server on Render: [How to Deploy Plugins Server on Render](https://docs.typingmind.com/plugins/plugins-server/how-to-deploy-plugins-server-on-render)\n- The generated Word files will be automatically removed after one hour.\n- The plugin currently does not support embedding images in Word documents.\n\n\n## **Example Usage**  \n> Can you create a business proposal for a new drink, Honey Vanilla Latte, at my coffee shop? It's a cozy blend of rich espresso, creamy steamed milk, locally sourced honey, and a hint of vanilla. The drink is free of artificial flavors, available hot or iced, and perfect for coffee lovers seeking a premium, sustainably crafted treat.",
+    "turnedOnByDefault": false,
+    "authenticationType": "AUTH_TYPE_NONE",
+    "implementationType": "http",
+    "dynamicContextEndpoints": [],
+    "sharedOAuthConnectionID": null
+}
