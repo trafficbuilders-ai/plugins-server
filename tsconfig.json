@@ -1,23 +1,23 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": ["ES2020", "DOM"],
-    "outDir": "dist",
-    "rootDir": "src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "types": ["node", "vitest/globals"],
-    "typeRoots": ["./node_modules/@types"],
+    "target": "ESNext",
+    "module": "CommonJS",
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    "moduleResolution": "Node",
+    "outDir": "dist",
+    "importsNotUsedAsValues": "remove",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "skipLibCheck": true,
+    "ignoreDeprecations": "5.0",
+    "types": ["vitest/globals"]
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "extends": [],
+  "exclude": ["node_modules"],
+  "include": ["src/**/*.ts"]
 }

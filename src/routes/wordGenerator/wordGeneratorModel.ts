@@ -25,53 +25,23 @@ const RowSchema = z.object({
   }),
 });
 
-// New types for header styles
-export const HeaderStyleSchema = z.object({
-  size: z.number().min(8).max(72),
-  color: z.string().regex(/^[0-9A-Fa-f]{6}$/),
-  font: z.string(),
-  bold: z.boolean(),
-});
-
-export const HeaderStylesSchema = z.object({
-  h1: HeaderStyleSchema,
-  h2: HeaderStyleSchema,
-  h3: HeaderStyleSchema,
-});
-
-// New type for image content
-export const ImageContentSchema = z.object({
-  type: z.literal('image'),
-  url: z.string().url(),
-  alt: z.string().optional(),
-  width: z.number().optional(),
-  height: z.number().optional(),
-});
-
-// New type for template selection
-export const TemplateSchema = z.enum([
-  'traffic-builders',
-  'shoq',
-  'datahive',
-  'unbound-group',
-  'default'
-]);
-
-// Extend existing content type to include images
-export const ContentSchema = z.object({
-  type: z.enum(['paragraph', 'listing', 'table', 'pageBreak', 'emptyLine', 'image']),
-  text: z.string().optional(),
-  items: z.array(z.string()).optional(),
-  headers: z.array(z.string()).optional(),
-  rows: z.array(z.object({
-    cells: z.array(z.object({
-      text: z.string(),
-    })),
-  })).optional(),
-  url: z.string().url().optional(),
-  alt: z.string().optional(),
-  width: z.number().optional(),
-  height: z.number().optional(),
+// Define Content Schema
+const ContentSchema = z.object({
+  type: z.enum(['paragraph', 'listing', 'table', 'pageBreak', 'emptyLine']).openapi({
+    description: 'Type of the content item.',
+  }),
+  text: z.string().optional().openapi({
+    description: 'Text content for paragraphs or listings.',
+  }),
+  items: z.array(z.string()).optional().openapi({
+    description: 'Items in a list for listing type content.',
+  }),
+  headers: z.array(z.string()).optional().openapi({
+    description: 'Headers for table content.',
+  }),
+  rows: z.array(RowSchema).optional().openapi({
+    description: 'Rows for table content.',
+  }),
 });
 
 // Define the base schema for a section
@@ -94,38 +64,75 @@ const SectionSchema = z.object({
   }),
 });
 
-// Extend existing request body schema
+// Request Body Schema
 export const WordGeneratorRequestBodySchema = z.object({
-  title: z.string(),
-  header: z.object({
-    text: z.string(),
-    alignment: z.enum(['left', 'center', 'right']),
-  }).optional(),
-  footer: z.object({
-    text: z.string(),
-    alignment: z.enum(['left', 'center', 'right']),
-  }).optional(),
-  sections: z.array(z.object({
-    sectionId: z.string(),
-    content: z.array(ContentSchema),
-    heading: z.string().optional(),
-    headingLevel: z.number().min(1).max(3).optional(),
-    parentSectionId: z.string().optional(),
-  })),
-  wordConfig: z.object({
-    fontSize: z.number(),
-    lineHeight: z.number(),
-    fontFamily: z.string(),
-    showPageNumber: z.boolean(),
-    showTableOfContent: z.boolean(),
-    showNumberingInHeader: z.boolean(),
-    numberingReference: z.string(),
-    pageOrientation: z.enum(['portrait', 'landscape']),
-    margins: z.string(),
-    // New optional fields
-    headerStyles: HeaderStylesSchema.optional(),
-    template: TemplateSchema.optional(),
+  title: z.string().openapi({
+    description: 'Title of the document.',
   }),
+  header: z.object({
+    text: z.string().openapi({
+      description: 'Text content for the header.',
+    }),
+    alignment: z.enum(['left', 'center', 'right']).default('left').openapi({
+      description: 'Alignment of the header text.',
+    }),
+  }),
+  footer: z.object({
+    text: z.string().openapi({
+      description: 'Text content for the footer.',
+    }),
+    alignment: z.enum(['left', 'center', 'right']).default('left').openapi({
+      description: 'Alignment of the footer text.',
+    }),
+  }),
+  sections: z.array(SectionSchema).openapi({
+    description: 'Sections of the document, which may include sub-sections.',
+  }),
+  wordConfig: z
+    .object({
+      fontSize: z.number().default(12).openapi({
+        description: 'Font size for the slides, default is 12 pt.',
+      }),
+      lineHeight: z.enum(['1', '1.15', '1.25', '1.5', '2']).default('1').openapi({
+        description: 'Line height for text content.',
+      }),
+      fontFamily: z
+        .enum(['Arial', 'Calibri', 'Times New Roman', 'Courier New', 'Verdana', 'Tahoma', 'Georgia', 'Comic Sans MS'])
+        .default('Arial')
+        .openapi({
+          description: 'Font family for the slides, default is Arial.',
+        }),
+      showPageNumber: z.boolean().default(false).openapi({
+        description: 'Option to display page numbers in the document.',
+      }),
+      showTableOfContent: z.boolean().default(false).openapi({
+        description: 'Option to display a table of contents.',
+      }),
+      showNumberingInHeader: z.boolean().default(false).openapi({
+        description: 'Option to display numbering in the header.',
+      }),
+      numberingReference: z
+        .enum([
+          '1.1.1.1 (Decimal)',
+          'I.1.a.i (Roman -> Decimal > Lower Letter -> Lower Roman)',
+          'I.A.1.a (Roman -> Upper Letter -> Decimal -> Lower Letter)',
+          '1)a)i)(i) (Decimal -> Lower Letter -> Lower Roman -> Lower Roman with Parentheses)',
+          'A.1.a.i (Upper Letter -> Decimal -> Lower Letter -> Lower Roman)',
+        ])
+        .default('1.1.1.1 (Decimal)')
+        .openapi({
+          description: 'Set numbering hierarchy format for the document.',
+        }),
+      pageOrientation: z.enum(['portrait', 'landscape']).default('portrait').openapi({
+        description: 'Set the page orientation for the document.',
+      }),
+      margins: z.enum(['normal', 'narrow', 'moderate', 'wide', 'mirrored']).default('normal').openapi({
+        description: 'Set page margins for the document.',
+      }),
+    })
+    .openapi({
+      description: 'Word configuration settings for generating the document.',
+    }),
 });
 
 export type WordGeneratorRequestBody = z.infer<typeof WordGeneratorRequestBodySchema>;
